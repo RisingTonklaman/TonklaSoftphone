@@ -1,0 +1,3 @@
+C:/TonklaSoftphone/build_x64/CMakeFiles/softphone.dir
+C:/TonklaSoftphone/build_x64/CMakeFiles/ALL_BUILD.dir
+C:/TonklaSoftphone/build_x64/CMakeFiles/ZERO_CHECK.dir

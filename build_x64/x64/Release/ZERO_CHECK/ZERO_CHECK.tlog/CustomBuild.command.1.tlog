@@ -1,0 +1,10 @@
+^C:\TONKLASOFTPHONE\BUILD_X64\CMAKEFILES\B655F2DD8E4EA2547D0E89ACAD3B36F7\GENERATE.STAMP.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -SC:/TonklaSoftphone -BC:/TonklaSoftphone/build_x64 --check-stamp-list CMakeFiles/generate.stamp.list --vs-solution-file C:/TonklaSoftphone/build_x64/TonklaSoftphone.sln
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd

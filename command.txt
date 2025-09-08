@@ -1,0 +1,17 @@
+บันทึกวิดีโอ
+ffmpeg -y -f gdigrab -framerate 30 -draw_mouse 0 -i title="pj-remote-video" -f dshow -i audio="CABLE Output (VB-Audio Virtual Cable)" -f dshow -i audio="Microphone (AB13X USB Audio)" -filter_complex "[1:a]aresample=async=1:first_pts=0[a1];[2:a]aresample=async=1:first_pts=0[a2];[a1][a2]amix=inputs=2:duration=longest:normalize=1[a]" -map 0:v -map "[a]" -c:v libx264 -preset ultrafast -crf 23 -pix_fmt yuv420p -c:a aac -b:a 128k -ar 48000 -ac 2 -shortest -movflags +faststart "C:\TonklaSoftphone\recordings\remote_mix.mp4"
+
+เริ่มเชื่อมต่อ asterisk
+C:\TonklaSoftphone\build_x64\Release\softphone.exe 1073 pass1073 192.168.100.200
+
+Commands:
+  d <ext|sip-uri>  : dial (video enabled)
+  a                : answer incoming (200 OK, with video)
+  h                : hangup active call
+  w <path.wav>     : play WAV into call
+  tx <gain>        : set TX level (e.g. 1.10)
+  rx <gain>        : set RX level (e.g. 1.05)
+  pv [cap_id]      : start local camera preview (default cap 0)
+  pvoff [cap_id]   : stop local camera preview (default cap 0)
+  lsvid            : list video devices (cap/render)
+  q                : quit

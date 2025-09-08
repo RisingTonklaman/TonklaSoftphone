@@ -1,0 +1,13 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <CustomBuild Include="C:\TonklaSoftphone\build_x64\CMakeFiles\b655f2dd8e4ea2547d0e89acad3b36f7\generate.stamp.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="CMake Rules">
+      <UniqueIdentifier>{5E76D196-5DA4-335F-8171-6C7DDFFFAE60}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>
