@@ -5,28 +5,33 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # ---- Roots ----
-set(PJSIP_ROOT "" CACHE PATH "Path to PJSIP install root (with include/ and lib/)")
-set(OPENH264_DIR "C:/deps/openh264/src_full" CACHE PATH "OpenH264 root")
+# Defaults to local, override if you have system installs
+set(PJSIP_ROOT "${CMAKE_SOURCE_DIR}/pjsip/pjproject/install" CACHE PATH "Path to PJSIP install root (with include/ and lib/)")
+set(OPENH264_DIR "${CMAKE_SOURCE_DIR}/third_party/openh264" CACHE PATH "OpenH264 root")
+set(VCPKG_DIR "${CMAKE_SOURCE_DIR}/third_party/vcpkg" CACHE PATH "vcpkg root (for SDL2)")
 
 # ---- Validate ----
 if(NOT IS_DIRECTORY "${PJSIP_ROOT}/include" OR NOT IS_DIRECTORY "${PJSIP_ROOT}/lib")
   message(FATAL_ERROR "PJSIP_ROOT invalid. Expect include/ and lib/ under: ${PJSIP_ROOT}")
 endif()
 if(NOT EXISTS "${OPENH264_DIR}/build_x64/openh264.lib")
-  message(FATAL_ERROR "Missing ${OPENH264_DIR}/build_x64/openh264.lib")
+  message(FATAL_ERROR "Missing ${OPENH264_DIR}/build_x64/openh264.lib (run scripts/setup-windows.ps1)")
 endif()
 if(NOT EXISTS "${OPENH264_DIR}/build_x64/openh264-8.dll")
-  message(FATAL_ERROR "Missing ${OPENH264_DIR}/build_x64/openh264-8.dll")
+  message(FATAL_ERROR "Missing ${OPENH264_DIR}/build_x64/openh264-8.dll (run scripts/setup-windows.ps1)")
 endif()
 
 # ---- External libs ----
 file(GLOB PJSIP_LIBS "${PJSIP_ROOT}/lib/*.lib")
 
 # SDL2 (renderer ของ pjmedia)
-find_library(SDL2_LIB NAMES SDL2 PATHS "C:/vcpkg/installed/x64-windows/lib" NO_DEFAULT_PATH)
-find_file(SDL2_DLL NAMES SDL2.dll PATHS "C:/vcpkg/installed/x64-windows/bin" NO_DEFAULT_PATH)
+set(_VCPKG_INC "${VCPKG_DIR}/installed/x64-windows/include")
+set(_VCPKG_LIB "${VCPKG_DIR}/installed/x64-windows/lib")
+set(_VCPKG_BIN "${VCPKG_DIR}/installed/x64-windows/bin")
+find_library(SDL2_LIB NAMES SDL2 PATHS "${_VCPKG_LIB}" NO_DEFAULT_PATH)
+find_file(SDL2_DLL NAMES SDL2.dll PATHS "${_VCPKG_BIN}" NO_DEFAULT_PATH)
 if(NOT SDL2_LIB)
-  message(FATAL_ERROR "SDL2.lib not found at C:/vcpkg/installed/x64-windows/lib")
+  message(FATAL_ERROR "SDL2.lib not found. Expected at ${_VCPKG_LIB}. Run scripts/setup-windows.ps1")
 endif()
 
 # ---- Target ----
@@ -41,7 +46,7 @@ target_compile_definitions(softphone PRIVATE NOMINMAX)
 target_include_directories(softphone PRIVATE
   "${PJSIP_ROOT}/include"
   "${OPENH264_DIR}/codec/api"       # มีโฟลเดอร์ย่อย 'wels'
-  "C:/vcpkg/installed/x64-windows/include"  # SDL2 headers
+  "${_VCPKG_INC}"                    # SDL2 headers
 )
 
 # link libs

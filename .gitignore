@@ -1,0 +1,48 @@
+# Build artifacts
+build/
+build_*/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+*.sln
+*.vcxproj*
+*.user
+*.obj
+*.pdb
+*.ilk
+*.log
+*.tlog
+*.lastbuildstate
+*.dir/
+*.cache/
+
+# Binaries
+*.exe
+*.dll
+*.lib
+*.exp
+*.apk
+*.a
+*.so
+
+# Local deps
+third_party/
+!third_party/.keep
+
+# PJSIP local build/install
+# Keep install/ tracked so fresh clones can build without rebuilding pjproject
+!pjsip/pjproject/install/**
+pjsip/pjproject/lib/
+pjsip/pjproject/x64/
+
+# IDE
+.vs/
+.vscode/
+
+# Outputs
+recordings/
+
+# OS files
+Thumbs.db
+Desktop.ini
+*.DS_Store
