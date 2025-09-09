@@ -41,3 +41,4 @@
 *.local
 /pjsip
 /pjsip
+pjsip/pjproject
