@@ -17,9 +17,13 @@ endif()
 if(NOT EXISTS "${OPENH264_DIR}/build_x64/openh264.lib")
   message(FATAL_ERROR "Missing ${OPENH264_DIR}/build_x64/openh264.lib (run scripts/setup-windows.ps1)")
 endif()
-if(NOT EXISTS "${OPENH264_DIR}/build_x64/openh264-8.dll")
-  message(FATAL_ERROR "Missing ${OPENH264_DIR}/build_x64/openh264-8.dll (run scripts/setup-windows.ps1)")
+# Find any available OpenH264 runtime DLL (supports -7, -8, etc.)
+file(GLOB _OPENH264_DLLS "${OPENH264_DIR}/build_x64/openh264-*.dll")
+if(NOT _OPENH264_DLLS)
+  message(FATAL_ERROR "Missing OpenH264 DLL in ${OPENH264_DIR}/build_x64 (run scripts/setup-windows.ps1)")
 endif()
+list(GET _OPENH264_DLLS 0 OPENH264_DLL_PATH)
+message(STATUS "Using OpenH264 DLL: ${OPENH264_DLL_PATH}")
 
 # ---- External libs ----
 file(GLOB PJSIP_LIBS "${PJSIP_ROOT}/lib/*.lib")
@@ -60,8 +64,14 @@ target_link_libraries(softphone PRIVATE
 # copy DLLs ข้าง ๆ exe
 add_custom_command(TARGET softphone POST_BUILD
   COMMAND "${CMAKE_COMMAND}" -E copy_if_different
-          "${OPENH264_DIR}/build_x64/openh264-8.dll"
+          "${OPENH264_DLL_PATH}"
           "$<TARGET_FILE_DIR:softphone>/"
+)
+# Also ensure a copy named openh264-7.dll is present for runtime loaders
+add_custom_command(TARGET softphone POST_BUILD
+  COMMAND "${CMAKE_COMMAND}" -E copy_if_different
+          "${OPENH264_DLL_PATH}"
+          "$<TARGET_FILE_DIR:softphone>/openh264-7.dll"
 )
 if(SDL2_DLL)
   add_custom_command(TARGET softphone POST_BUILD

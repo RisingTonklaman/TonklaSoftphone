@@ -1,48 +1,41 @@
-# Build artifacts
-build/
-build_*/
-CMakeFiles/
-CMakeCache.txt
-cmake_install.cmake
-*.sln
-*.vcxproj*
+# Build and IDE
+/.vs/
+/.vscode/
+*.VC.db
+*.suo
 *.user
-*.obj
-*.pdb
-*.ilk
-*.log
+*.vcxproj.user
+*.opendb
 *.tlog
-*.lastbuildstate
-*.dir/
-*.cache/
 
-# Binaries
-*.exe
-*.dll
-*.lib
-*.exp
-*.apk
-*.a
-*.so
+# CMake
+/build_*/
+/CMakeFiles/
+/CMakeCache.txt
+/*.dir/
+/*.pdb
+/*.ilk
+/*.obj
+/*.log
 
-# Local deps
-third_party/
-!third_party/.keep
+# Artifacts and packages
+/dist/
+*.zip
+*.7z
+*.tar
+*.tar.gz
 
-# PJSIP local build/install
-# Keep install/ tracked so fresh clones can build without rebuilding pjproject
-!pjsip/pjproject/install/**
-pjsip/pjproject/lib/
-pjsip/pjproject/x64/
+# Third-party heavy deps (recreated by scripts/setup-windows.ps1)
+/third_party/vcpkg/
+/third_party/openh264/
 
-# IDE
-.vs/
-.vscode/
+# PJSIP install output
+/vendor/pjsip/install/
 
-# Outputs
-recordings/
+# pjproject build outputs
+/pjsip/pjproject/lib/
+/pjsip/pjproject/x64/
 
-# OS files
-Thumbs.db
-Desktop.ini
-*.DS_Store
+# Local env files
+*.env
+*.local

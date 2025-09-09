@@ -86,7 +86,7 @@
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
-      <AdditionalIncludeDirectories>C:\TonklaSoftphone\pjsip\pjproject\install\include;C:\deps\openh264\src_full\codec\api;C:\vcpkg\installed\x64-windows\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\TonklaSoftphone\vendor\pjsip\install\include;C:\TonklaSoftphone\third_party\openh264\codec\api;C:\TonklaSoftphone\third_party\vcpkg\installed\x64-windows\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AssemblerListingLocation>$(IntDir)</AssemblerListingLocation>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
@@ -105,10 +105,10 @@
     </ClCompile>
     <ResourceCompile>
       <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_DEBUG;_WINDOWS;NOMINMAX;CMAKE_INTDIR=\"Debug\"</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>C:\TonklaSoftphone\pjsip\pjproject\install\include;C:\deps\openh264\src_full\codec\api;C:\vcpkg\installed\x64-windows\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\TonklaSoftphone\vendor\pjsip\install\include;C:\TonklaSoftphone\third_party\openh264\codec\api;C:\TonklaSoftphone\third_party\vcpkg\installed\x64-windows\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ResourceCompile>
     <Midl>
-      <AdditionalIncludeDirectories>C:\TonklaSoftphone\pjsip\pjproject\install\include;C:\deps\openh264\src_full\codec\api;C:\vcpkg\installed\x64-windows\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\TonklaSoftphone\vendor\pjsip\install\include;C:\TonklaSoftphone\third_party\openh264\codec\api;C:\TonklaSoftphone\third_party\vcpkg\installed\x64-windows\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <OutputDirectory>$(ProjectDir)/$(IntDir)</OutputDirectory>
       <HeaderFileName>%(Filename).h</HeaderFileName>
       <TypeLibraryName>%(Filename).tlb</TypeLibraryName>
@@ -116,9 +116,18 @@
       <ProxyFileName>%(Filename)_p.c</ProxyFileName>
     </Midl>
     <PostBuildEvent>
-      <Message>	</Message>
+      <Message>		</Message>
       <Command>setlocal
-"C:\Program Files\CMake\bin\cmake.exe" -E copy_if_different C:/deps/openh264/src_full/build_x64/openh264-8.dll C:/TonklaSoftphone/build_x64/Debug/
+"C:\Program Files\CMake\bin\cmake.exe" -E copy_if_different C:/TonklaSoftphone/third_party/openh264/build_x64/openh264-7.dll C:/TonklaSoftphone/build_x64/Debug/
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E copy_if_different C:/TonklaSoftphone/third_party/openh264/build_x64/openh264-7.dll C:/TonklaSoftphone/build_x64/Debug/openh264-7.dll
 if %errorlevel% neq 0 goto :cmEnd
 :cmEnd
 endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
@@ -137,7 +146,7 @@ exit /b %1
 if %errorlevel% neq 0 goto :VCEnd</Command>
     </PostBuildEvent>
     <Link>
-      <AdditionalDependencies>C:\TonklaSoftphone\pjsip\pjproject\install\lib\libpjproject-x86_64-x64-vc14-Release.lib;C:\deps\openh264\src_full\build_x64\openh264.lib;C:\vcpkg\installed\x64-windows\lib\SDL2.lib;ws2_32.lib;iphlpapi.lib;winmm.lib;ole32.lib;uuid.lib;gdi32.lib;user32.lib;setupapi.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;comdlg32.lib;advapi32.lib</AdditionalDependencies>
+      <AdditionalDependencies>C:\TonklaSoftphone\vendor\pjsip\install\lib\libpjproject-x86_64-x64-vc14-Release.lib;C:\TonklaSoftphone\third_party\openh264\build_x64\openh264.lib;C:\vcpkg\installed\x64-windows\lib\SDL2.lib;ws2_32.lib;iphlpapi.lib;winmm.lib;ole32.lib;uuid.lib;gdi32.lib;user32.lib;setupapi.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;comdlg32.lib;advapi32.lib</AdditionalDependencies>
       <AdditionalLibraryDirectories>%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalOptions>%(AdditionalOptions) /machine:x64</AdditionalOptions>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -152,7 +161,7 @@ if %errorlevel% neq 0 goto :VCEnd</Command>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
-      <AdditionalIncludeDirectories>C:\TonklaSoftphone\pjsip\pjproject\install\include;C:\deps\openh264\src_full\codec\api;C:\vcpkg\installed\x64-windows\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\TonklaSoftphone\vendor\pjsip\install\include;C:\TonklaSoftphone\third_party\openh264\codec\api;C:\TonklaSoftphone\third_party\vcpkg\installed\x64-windows\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AssemblerListingLocation>$(IntDir)</AssemblerListingLocation>
       <BasicRuntimeChecks>Default</BasicRuntimeChecks>
       <ExceptionHandling>Sync</ExceptionHandling>
@@ -172,10 +181,10 @@ if %errorlevel% neq 0 goto :VCEnd</Command>
     </ClCompile>
     <ResourceCompile>
       <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;NOMINMAX;CMAKE_INTDIR=\"Release\"</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>C:\TonklaSoftphone\pjsip\pjproject\install\include;C:\deps\openh264\src_full\codec\api;C:\vcpkg\installed\x64-windows\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\TonklaSoftphone\vendor\pjsip\install\include;C:\TonklaSoftphone\third_party\openh264\codec\api;C:\TonklaSoftphone\third_party\vcpkg\installed\x64-windows\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ResourceCompile>
     <Midl>
-      <AdditionalIncludeDirectories>C:\TonklaSoftphone\pjsip\pjproject\install\include;C:\deps\openh264\src_full\codec\api;C:\vcpkg\installed\x64-windows\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\TonklaSoftphone\vendor\pjsip\install\include;C:\TonklaSoftphone\third_party\openh264\codec\api;C:\TonklaSoftphone\third_party\vcpkg\installed\x64-windows\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <OutputDirectory>$(ProjectDir)/$(IntDir)</OutputDirectory>
       <HeaderFileName>%(Filename).h</HeaderFileName>
       <TypeLibraryName>%(Filename).tlb</TypeLibraryName>
@@ -183,9 +192,18 @@ if %errorlevel% neq 0 goto :VCEnd</Command>
       <ProxyFileName>%(Filename)_p.c</ProxyFileName>
     </Midl>
     <PostBuildEvent>
-      <Message>	</Message>
+      <Message>		</Message>
       <Command>setlocal
-"C:\Program Files\CMake\bin\cmake.exe" -E copy_if_different C:/deps/openh264/src_full/build_x64/openh264-8.dll C:/TonklaSoftphone/build_x64/Release/
+"C:\Program Files\CMake\bin\cmake.exe" -E copy_if_different C:/TonklaSoftphone/third_party/openh264/build_x64/openh264-7.dll C:/TonklaSoftphone/build_x64/Release/
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E copy_if_different C:/TonklaSoftphone/third_party/openh264/build_x64/openh264-7.dll C:/TonklaSoftphone/build_x64/Release/openh264-7.dll
 if %errorlevel% neq 0 goto :cmEnd
 :cmEnd
 endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
@@ -204,7 +222,7 @@ exit /b %1
 if %errorlevel% neq 0 goto :VCEnd</Command>
     </PostBuildEvent>
     <Link>
-      <AdditionalDependencies>C:\TonklaSoftphone\pjsip\pjproject\install\lib\libpjproject-x86_64-x64-vc14-Release.lib;C:\deps\openh264\src_full\build_x64\openh264.lib;C:\vcpkg\installed\x64-windows\lib\SDL2.lib;ws2_32.lib;iphlpapi.lib;winmm.lib;ole32.lib;uuid.lib;gdi32.lib;user32.lib;setupapi.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;comdlg32.lib;advapi32.lib</AdditionalDependencies>
+      <AdditionalDependencies>C:\TonklaSoftphone\vendor\pjsip\install\lib\libpjproject-x86_64-x64-vc14-Release.lib;C:\TonklaSoftphone\third_party\openh264\build_x64\openh264.lib;C:\vcpkg\installed\x64-windows\lib\SDL2.lib;ws2_32.lib;iphlpapi.lib;winmm.lib;ole32.lib;uuid.lib;gdi32.lib;user32.lib;setupapi.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;comdlg32.lib;advapi32.lib</AdditionalDependencies>
       <AdditionalLibraryDirectories>%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalOptions>%(AdditionalOptions) /machine:x64</AdditionalOptions>
       <GenerateDebugInformation>false</GenerateDebugInformation>
@@ -219,7 +237,7 @@ if %errorlevel% neq 0 goto :VCEnd</Command>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">
     <ClCompile>
-      <AdditionalIncludeDirectories>C:\TonklaSoftphone\pjsip\pjproject\install\include;C:\deps\openh264\src_full\codec\api;C:\vcpkg\installed\x64-windows\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\TonklaSoftphone\vendor\pjsip\install\include;C:\TonklaSoftphone\third_party\openh264\codec\api;C:\TonklaSoftphone\third_party\vcpkg\installed\x64-windows\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AssemblerListingLocation>$(IntDir)</AssemblerListingLocation>
       <BasicRuntimeChecks>Default</BasicRuntimeChecks>
       <ExceptionHandling>Sync</ExceptionHandling>
@@ -239,10 +257,10 @@ if %errorlevel% neq 0 goto :VCEnd</Command>
     </ClCompile>
     <ResourceCompile>
       <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;NOMINMAX;CMAKE_INTDIR=\"MinSizeRel\"</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>C:\TonklaSoftphone\pjsip\pjproject\install\include;C:\deps\openh264\src_full\codec\api;C:\vcpkg\installed\x64-windows\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\TonklaSoftphone\vendor\pjsip\install\include;C:\TonklaSoftphone\third_party\openh264\codec\api;C:\TonklaSoftphone\third_party\vcpkg\installed\x64-windows\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ResourceCompile>
     <Midl>
-      <AdditionalIncludeDirectories>C:\TonklaSoftphone\pjsip\pjproject\install\include;C:\deps\openh264\src_full\codec\api;C:\vcpkg\installed\x64-windows\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\TonklaSoftphone\vendor\pjsip\install\include;C:\TonklaSoftphone\third_party\openh264\codec\api;C:\TonklaSoftphone\third_party\vcpkg\installed\x64-windows\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <OutputDirectory>$(ProjectDir)/$(IntDir)</OutputDirectory>
       <HeaderFileName>%(Filename).h</HeaderFileName>
       <TypeLibraryName>%(Filename).tlb</TypeLibraryName>
@@ -250,9 +268,18 @@ if %errorlevel% neq 0 goto :VCEnd</Command>
       <ProxyFileName>%(Filename)_p.c</ProxyFileName>
     </Midl>
     <PostBuildEvent>
-      <Message>	</Message>
+      <Message>		</Message>
       <Command>setlocal
-"C:\Program Files\CMake\bin\cmake.exe" -E copy_if_different C:/deps/openh264/src_full/build_x64/openh264-8.dll C:/TonklaSoftphone/build_x64/MinSizeRel/
+"C:\Program Files\CMake\bin\cmake.exe" -E copy_if_different C:/TonklaSoftphone/third_party/openh264/build_x64/openh264-7.dll C:/TonklaSoftphone/build_x64/MinSizeRel/
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E copy_if_different C:/TonklaSoftphone/third_party/openh264/build_x64/openh264-7.dll C:/TonklaSoftphone/build_x64/MinSizeRel/openh264-7.dll
 if %errorlevel% neq 0 goto :cmEnd
 :cmEnd
 endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
@@ -271,7 +298,7 @@ exit /b %1
 if %errorlevel% neq 0 goto :VCEnd</Command>
     </PostBuildEvent>
     <Link>
-      <AdditionalDependencies>C:\TonklaSoftphone\pjsip\pjproject\install\lib\libpjproject-x86_64-x64-vc14-Release.lib;C:\deps\openh264\src_full\build_x64\openh264.lib;C:\vcpkg\installed\x64-windows\lib\SDL2.lib;ws2_32.lib;iphlpapi.lib;winmm.lib;ole32.lib;uuid.lib;gdi32.lib;user32.lib;setupapi.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;comdlg32.lib;advapi32.lib</AdditionalDependencies>
+      <AdditionalDependencies>C:\TonklaSoftphone\vendor\pjsip\install\lib\libpjproject-x86_64-x64-vc14-Release.lib;C:\TonklaSoftphone\third_party\openh264\build_x64\openh264.lib;C:\vcpkg\installed\x64-windows\lib\SDL2.lib;ws2_32.lib;iphlpapi.lib;winmm.lib;ole32.lib;uuid.lib;gdi32.lib;user32.lib;setupapi.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;comdlg32.lib;advapi32.lib</AdditionalDependencies>
       <AdditionalLibraryDirectories>%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalOptions>%(AdditionalOptions) /machine:x64</AdditionalOptions>
       <GenerateDebugInformation>false</GenerateDebugInformation>
@@ -286,7 +313,7 @@ if %errorlevel% neq 0 goto :VCEnd</Command>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">
     <ClCompile>
-      <AdditionalIncludeDirectories>C:\TonklaSoftphone\pjsip\pjproject\install\include;C:\deps\openh264\src_full\codec\api;C:\vcpkg\installed\x64-windows\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\TonklaSoftphone\vendor\pjsip\install\include;C:\TonklaSoftphone\third_party\openh264\codec\api;C:\TonklaSoftphone\third_party\vcpkg\installed\x64-windows\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AssemblerListingLocation>$(IntDir)</AssemblerListingLocation>
       <BasicRuntimeChecks>Default</BasicRuntimeChecks>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
@@ -305,10 +332,10 @@ if %errorlevel% neq 0 goto :VCEnd</Command>
     </ClCompile>
     <ResourceCompile>
       <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;NOMINMAX;CMAKE_INTDIR=\"RelWithDebInfo\"</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>C:\TonklaSoftphone\pjsip\pjproject\install\include;C:\deps\openh264\src_full\codec\api;C:\vcpkg\installed\x64-windows\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\TonklaSoftphone\vendor\pjsip\install\include;C:\TonklaSoftphone\third_party\openh264\codec\api;C:\TonklaSoftphone\third_party\vcpkg\installed\x64-windows\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ResourceCompile>
     <Midl>
-      <AdditionalIncludeDirectories>C:\TonklaSoftphone\pjsip\pjproject\install\include;C:\deps\openh264\src_full\codec\api;C:\vcpkg\installed\x64-windows\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\TonklaSoftphone\vendor\pjsip\install\include;C:\TonklaSoftphone\third_party\openh264\codec\api;C:\TonklaSoftphone\third_party\vcpkg\installed\x64-windows\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <OutputDirectory>$(ProjectDir)/$(IntDir)</OutputDirectory>
       <HeaderFileName>%(Filename).h</HeaderFileName>
       <TypeLibraryName>%(Filename).tlb</TypeLibraryName>
@@ -316,9 +343,18 @@ if %errorlevel% neq 0 goto :VCEnd</Command>
       <ProxyFileName>%(Filename)_p.c</ProxyFileName>
     </Midl>
     <PostBuildEvent>
-      <Message>	</Message>
+      <Message>		</Message>
       <Command>setlocal
-"C:\Program Files\CMake\bin\cmake.exe" -E copy_if_different C:/deps/openh264/src_full/build_x64/openh264-8.dll C:/TonklaSoftphone/build_x64/RelWithDebInfo/
+"C:\Program Files\CMake\bin\cmake.exe" -E copy_if_different C:/TonklaSoftphone/third_party/openh264/build_x64/openh264-7.dll C:/TonklaSoftphone/build_x64/RelWithDebInfo/
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E copy_if_different C:/TonklaSoftphone/third_party/openh264/build_x64/openh264-7.dll C:/TonklaSoftphone/build_x64/RelWithDebInfo/openh264-7.dll
 if %errorlevel% neq 0 goto :cmEnd
 :cmEnd
 endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
@@ -337,7 +373,7 @@ exit /b %1
 if %errorlevel% neq 0 goto :VCEnd</Command>
     </PostBuildEvent>
     <Link>
-      <AdditionalDependencies>C:\TonklaSoftphone\pjsip\pjproject\install\lib\libpjproject-x86_64-x64-vc14-Release.lib;C:\deps\openh264\src_full\build_x64\openh264.lib;C:\vcpkg\installed\x64-windows\lib\SDL2.lib;ws2_32.lib;iphlpapi.lib;winmm.lib;ole32.lib;uuid.lib;gdi32.lib;user32.lib;setupapi.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;comdlg32.lib;advapi32.lib</AdditionalDependencies>
+      <AdditionalDependencies>C:\TonklaSoftphone\vendor\pjsip\install\lib\libpjproject-x86_64-x64-vc14-Release.lib;C:\TonklaSoftphone\third_party\openh264\build_x64\openh264.lib;C:\vcpkg\installed\x64-windows\lib\SDL2.lib;ws2_32.lib;iphlpapi.lib;winmm.lib;ole32.lib;uuid.lib;gdi32.lib;user32.lib;setupapi.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;comdlg32.lib;advapi32.lib</AdditionalDependencies>
       <AdditionalLibraryDirectories>%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalOptions>%(AdditionalOptions) /machine:x64</AdditionalOptions>
       <GenerateDebugInformation>true</GenerateDebugInformation>

@@ -51,11 +51,18 @@ function Stage-OpenH264FromVcpkg {
   $lib = Get-ChildItem -Path $pkgLib -Filter 'openh264*.lib' -ErrorAction SilentlyContinue | Select-Object -First 1
   if (-not $dll -or -not $lib) { throw 'vcpkg openh264 not found after install' }
   New-Item -ItemType Directory -Force -Path $OpenH264Build | Out-Null
-  Copy-Item $dll.FullName (Join-Path $OpenH264Build 'openh264-8.dll') -Force
+  # Preserve original DLL name and also provide compatibility aliases (-7 and -8)
+  $origName = Split-Path $dll.Name -Leaf
+  Copy-Item $dll.FullName (Join-Path $OpenH264Build $origName) -Force
   Copy-Item $lib.FullName (Join-Path $OpenH264Build 'openh264.lib') -Force
+  # Create aliases if missing
+  $alias7 = Join-Path $OpenH264Build 'openh264-7.dll'
+  $alias8 = Join-Path $OpenH264Build 'openh264-8.dll'
+  if (-not (Test-Path $alias7)) { Copy-Item (Join-Path $OpenH264Build $origName) $alias7 -Force }
+  if (-not (Test-Path $alias8)) { Copy-Item (Join-Path $OpenH264Build $origName) $alias8 -Force }
   Write-Host "[setup] Staged OpenH264 from vcpkg:" -ForegroundColor DarkCyan
-  Write-Host "  DLL: $($dll.FullName) -> $OpenH264Build\openh264-8.dll"
-  Write-Host "  LIB: $($lib.FullName) -> $OpenH264Build\openh264.lib"
+  Write-Host "  DLLs: $($dll.FullName) -> $OpenH264Build\$origName, openh264-7.dll, openh264-8.dll"
+  Write-Host "  LIB : $($lib.FullName) -> $OpenH264Build\openh264.lib"
 }
 
 Invoke-Step 'Fetch and build OpenH264 (x64 Release, shared)' {
@@ -90,11 +97,17 @@ Invoke-Step 'Fetch and build OpenH264 (x64 Release, shared)' {
     if (-not $dll) { $dll = $dllCandidates | Select-Object -First 1 }
     $lib = $libCandidates | Where-Object { $_.FullName -match '\\Release\\' } | Select-Object -First 1
     if (-not $lib) { $lib = $libCandidates | Select-Object -First 1 }
-    Copy-Item $dll.FullName (Join-Path $OpenH264Build 'openh264-8.dll') -Force
+    # Preserve original DLL name and also provide compatibility aliases (-7 and -8)
+    $origName = Split-Path $dll.Name -Leaf
+    Copy-Item $dll.FullName (Join-Path $OpenH264Build $origName) -Force
     Copy-Item $lib.FullName (Join-Path $OpenH264Build 'openh264.lib') -Force
+    $alias7 = Join-Path $OpenH264Build 'openh264-7.dll'
+    $alias8 = Join-Path $OpenH264Build 'openh264-8.dll'
+    if (-not (Test-Path $alias7)) { Copy-Item (Join-Path $OpenH264Build $origName) $alias7 -Force }
+    if (-not (Test-Path $alias8)) { Copy-Item (Join-Path $OpenH264Build $origName) $alias8 -Force }
     Write-Host "[setup] Staged OpenH264 from local build:" -ForegroundColor DarkCyan
-    Write-Host "  DLL: $($dll.FullName) -> $OpenH264Build\openh264-8.dll"
-    Write-Host "  LIB: $($lib.FullName) -> $OpenH264Build\openh264.lib"
+    Write-Host "  DLLs: $($dll.FullName) -> $OpenH264Build\$origName, openh264-7.dll, openh264-8.dll"
+    Write-Host "  LIB : $($lib.FullName) -> $OpenH264Build\openh264.lib"
   }
 }
 

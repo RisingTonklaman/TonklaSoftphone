@@ -171,10 +171,10 @@ CMAKE_VERBOSE_MAKEFILE:BOOL=FALSE
 GSTREAMER_ROOT:UNINITIALIZED=C:\gstreamer\1.0\msvc_x86_64
 
 //OpenH264 root
-OPENH264_DIR:PATH=C:/deps/openh264/src_full
+OPENH264_DIR:PATH=C:/TonklaSoftphone/third_party/openh264
 
 //Path to PJSIP install root (with include/ and lib/)
-PJSIP_ROOT:PATH=C:/TonklaSoftphone/pjsip/pjproject/install
+PJSIP_ROOT:PATH=C:/TonklaSoftphone/vendor/pjsip/install
 
 //Path to a file.
 SDL2_DLL:FILEPATH=C:/vcpkg/installed/x64-windows/bin/SDL2.dll
@@ -190,6 +190,9 @@ TonklaSoftphone_IS_TOP_LEVEL:STATIC=ON
 
 //Value Computed by CMake
 TonklaSoftphone_SOURCE_DIR:STATIC=C:/TonklaSoftphone
+
+//vcpkg root (for SDL2)
+VCPKG_DIR:PATH=C:/TonklaSoftphone/third_party/vcpkg
 
 
 ########################
