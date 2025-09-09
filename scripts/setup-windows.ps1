@@ -41,30 +41,61 @@ Invoke-Step 'Bootstrap vcpkg and install SDL2:x64-windows' {
 # 3) OpenH264 build (shared lib)
 $OpenH264Root = Join-Path $Third 'openh264'
 $OpenH264Build = Join-Path $OpenH264Root 'build_x64'
+
+function Stage-OpenH264FromVcpkg {
+  Write-Host "[setup] Fallback: install openh264 via vcpkg" -ForegroundColor Yellow
+  & (Join-Path $VcpkgRoot 'vcpkg.exe') install openh264:x64-windows --clean-after-build | Write-Host
+  $pkgBin = Join-Path $VcpkgRoot 'installed/x64-windows/bin'
+  $pkgLib = Join-Path $VcpkgRoot 'installed/x64-windows/lib'
+  $dll = Get-ChildItem -Path $pkgBin -Filter 'openh264*.dll' -ErrorAction SilentlyContinue | Select-Object -First 1
+  $lib = Get-ChildItem -Path $pkgLib -Filter 'openh264*.lib' -ErrorAction SilentlyContinue | Select-Object -First 1
+  if (-not $dll -or -not $lib) { throw 'vcpkg openh264 not found after install' }
+  New-Item -ItemType Directory -Force -Path $OpenH264Build | Out-Null
+  Copy-Item $dll.FullName (Join-Path $OpenH264Build 'openh264-8.dll') -Force
+  Copy-Item $lib.FullName (Join-Path $OpenH264Build 'openh264.lib') -Force
+  Write-Host "[setup] Staged OpenH264 from vcpkg:" -ForegroundColor DarkCyan
+  Write-Host "  DLL: $($dll.FullName) -> $OpenH264Build\openh264-8.dll"
+  Write-Host "  LIB: $($lib.FullName) -> $OpenH264Build\openh264.lib"
+}
+
 Invoke-Step 'Fetch and build OpenH264 (x64 Release, shared)' {
   if (-not (Test-Path $OpenH264Root)) {
     git clone --depth 1 --branch v2.4.1 https://github.com/cisco/openh264 $OpenH264Root | Out-Null
   }
-  New-Item -ItemType Directory -Force -Path $OpenH264Build | Out-Null
-  cmake -S $OpenH264Root -B $OpenH264Build -G "$VSGenerator" -A x64 -DBUILD_SHARED_LIBS=ON -DCMAKE_BUILD_TYPE=Release | Write-Host
-  cmake --build $OpenH264Build --config Release --parallel | Write-Host
+  # If directory exists but not a git repo and no CMakeLists, reclone
+  if (-not (Test-Path (Join-Path $OpenH264Root 'CMakeLists.txt'))) {
+    Write-Host "[setup] openh264 dir exists but invalid; recloning..." -ForegroundColor Yellow
+    Remove-Item -Recurse -Force $OpenH264Root -ErrorAction SilentlyContinue
+    git clone --depth 1 --branch v2.4.1 https://github.com/cisco/openh264 $OpenH264Root | Out-Null
+  }
 
-  # Copy/rename artifacts to expected names (search recursively; prefer Release)
+  if (Test-Path (Join-Path $OpenH264Root 'CMakeLists.txt')) {
+    New-Item -ItemType Directory -Force -Path $OpenH264Build | Out-Null
+    try {
+      cmake -S $OpenH264Root -B $OpenH264Build -G "$VSGenerator" -A x64 -DBUILD_SHARED_LIBS=ON -DCMAKE_BUILD_TYPE=Release | Write-Host
+      cmake --build $OpenH264Build --config Release --parallel | Write-Host
+    } catch {
+      Write-Host "[setup] CMake build of openh264 failed: $($_.Exception.Message)" -ForegroundColor Yellow
+    }
+  }
+
+  # Try to collect artifacts from build tree
   $dllCandidates = @(Get-ChildItem -Recurse $OpenH264Build -Filter 'openh264*.dll' -ErrorAction SilentlyContinue)
-  if (-not $dllCandidates -or $dllCandidates.Count -eq 0) {
-    throw "OpenH264 DLL not found after build (searched: $OpenH264Build)"
-  }
-  $dll = $dllCandidates | Where-Object { $_.FullName -match '\\Release\\' } | Select-Object -First 1
-  if (-not $dll) { $dll = $dllCandidates | Select-Object -First 1 }
-  Copy-Item $dll.FullName (Join-Path $OpenH264Build 'openh264-8.dll') -Force
-
   $libCandidates = @(Get-ChildItem -Recurse $OpenH264Build -Filter 'openh264*.lib' -ErrorAction SilentlyContinue)
-  if (-not $libCandidates -or $libCandidates.Count -eq 0) {
-    throw "OpenH264 LIB not found after build (searched: $OpenH264Build)"
+
+  if (-not $dllCandidates -or $dllCandidates.Count -eq 0 -or -not $libCandidates -or $libCandidates.Count -eq 0) {
+    Stage-OpenH264FromVcpkg
+  } else {
+    $dll = $dllCandidates | Where-Object { $_.FullName -match '\\Release\\' } | Select-Object -First 1
+    if (-not $dll) { $dll = $dllCandidates | Select-Object -First 1 }
+    $lib = $libCandidates | Where-Object { $_.FullName -match '\\Release\\' } | Select-Object -First 1
+    if (-not $lib) { $lib = $libCandidates | Select-Object -First 1 }
+    Copy-Item $dll.FullName (Join-Path $OpenH264Build 'openh264-8.dll') -Force
+    Copy-Item $lib.FullName (Join-Path $OpenH264Build 'openh264.lib') -Force
+    Write-Host "[setup] Staged OpenH264 from local build:" -ForegroundColor DarkCyan
+    Write-Host "  DLL: $($dll.FullName) -> $OpenH264Build\openh264-8.dll"
+    Write-Host "  LIB: $($lib.FullName) -> $OpenH264Build\openh264.lib"
   }
-  $lib = $libCandidates | Where-Object { $_.FullName -match '\\Release\\' } | Select-Object -First 1
-  if (-not $lib) { $lib = $libCandidates | Select-Object -First 1 }
-  Copy-Item $lib.FullName (Join-Path $OpenH264Build 'openh264.lib') -Force
 }
 
 # 4) Build PJSIP from in-tree pjproject (optional)
