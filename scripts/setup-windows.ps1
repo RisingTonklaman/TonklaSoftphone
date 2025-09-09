@@ -49,13 +49,21 @@ Invoke-Step 'Fetch and build OpenH264 (x64 Release, shared)' {
   cmake -S $OpenH264Root -B $OpenH264Build -G "$VSGenerator" -A x64 -DBUILD_SHARED_LIBS=ON -DCMAKE_BUILD_TYPE=Release | Write-Host
   cmake --build $OpenH264Build --config Release --parallel | Write-Host
 
-  # Copy/rename artifacts to expected names
-  $dll = Get-ChildItem -Path (Join-Path $OpenH264Build 'Release') -Filter 'openh264*.dll' -ErrorAction SilentlyContinue | Select-Object -First 1
-  if (-not $dll) { throw 'OpenH264 DLL not found after build' }
+  # Copy/rename artifacts to expected names (search recursively; prefer Release)
+  $dllCandidates = @(Get-ChildItem -Recurse $OpenH264Build -Filter 'openh264*.dll' -ErrorAction SilentlyContinue)
+  if (-not $dllCandidates -or $dllCandidates.Count -eq 0) {
+    throw "OpenH264 DLL not found after build (searched: $OpenH264Build)"
+  }
+  $dll = $dllCandidates | Where-Object { $_.FullName -match '\\Release\\' } | Select-Object -First 1
+  if (-not $dll) { $dll = $dllCandidates | Select-Object -First 1 }
   Copy-Item $dll.FullName (Join-Path $OpenH264Build 'openh264-8.dll') -Force
 
-  $lib = Get-ChildItem -Path (Join-Path $OpenH264Build 'Release') -Filter 'openh264*.lib' -ErrorAction SilentlyContinue | Select-Object -First 1
-  if (-not $lib) { throw 'OpenH264 LIB not found after build' }
+  $libCandidates = @(Get-ChildItem -Recurse $OpenH264Build -Filter 'openh264*.lib' -ErrorAction SilentlyContinue)
+  if (-not $libCandidates -or $libCandidates.Count -eq 0) {
+    throw "OpenH264 LIB not found after build (searched: $OpenH264Build)"
+  }
+  $lib = $libCandidates | Where-Object { $_.FullName -match '\\Release\\' } | Select-Object -First 1
+  if (-not $lib) { $lib = $libCandidates | Select-Object -First 1 }
   Copy-Item $lib.FullName (Join-Path $OpenH264Build 'openh264.lib') -Force
 }
 
