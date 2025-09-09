@@ -16,7 +16,7 @@
 - อินเทอร์เน็ตสำหรับดาวน์โหลด dependencies (vcpkg/SDL2, OpenH264)
 
 ## โครงสร้าง Dependencies
-- PJSIP: ใช้ซอร์สใน `pjsip/pjproject` และแพ็คเกจเป็น layout ติดตั้งไว้ที่ `pjsip/pjproject/install` โดยสคริปต์
+- PJSIP: เวนเดอร์ไฟล์ติดตั้งไว้ที่ `vendor/pjsip/install` (headers+lib พร้อมใช้งาน)
 - OpenH264: โคลนและบิลด์ไว้ที่ `third_party/openh264` ผลลัพธ์อยู่ใน `third_party/openh264/build_x64`
 - SDL2: ติดตั้งผ่าน vcpkg ที่ `third_party/vcpkg/installed/x64-windows`
 
@@ -34,13 +34,13 @@
 สิ่งที่สคริปต์ทำ:
 - โคลนและบูตสแตรป vcpkg, ติดตั้ง `sdl2:x64-windows`
 - โคลน/บิลด์ OpenH264 (ปล่อย DLL แบบ shared)
-- (ตัวเลือก) บิลด์ PJSIP จากโฟลเดอร์ `pjsip/pjproject` และแพ็คเกจเข้า `pjsip/pjproject/install` — ดีฟอลต์ปิดเพื่อเลี่ยงความยุ่งยากของการตั้งค่า include/lib ใน VS; ใช้ `-BuildPjsip` หากต้องการลองบิลด์เอง
+- (ตัวเลือก) บิลด์ PJSIP จากโฟลเดอร์ `pjsip/pjproject` และแพ็คเกจเข้า `vendor/pjsip/install` — ดีฟอลต์ปิด; ใช้ `-BuildPjsip` หากต้องการบิลด์เอง
 
 3) บิลด์แอป
 ```
  powershell -ExecutionPolicy Bypass -File .\scripts\build.ps1 -Config Release
 ```
-ไบนารีจะอยู่ที่ `build_x64/Release/softphone.exe` และมีการคัดลอก `openh264-8.dll` และ `SDL2.dll` ไปไว้ข้างๆ ให้เรียบร้อย
+ไบนารีจะอยู่ที่ `build_x64/Release/softphone.exe` และมีการคัดลอก `openh264-8.dll` และ `SDL2.dll` ไปไว้ข้างๆ ให้เรียบร้อย หากยังไม่มี PJSIP ใน `vendor/pjsip/install` สคริปต์จะพยายามบิลด์ pjproject ให้อัตโนมัติ
 
 4) รัน
 ```
@@ -72,16 +72,16 @@ ffmpeg -y -f gdigrab -framerate 30 -draw_mouse 0 -i title="pj-remote-video" ^
 หมายเหตุ: ต้องติดตั้ง ffmpeg เอง และตั้งชื่ออุปกรณ์เสียงตามเครื่องใช้งานจริง
 
 ## โฟลเดอร์/ไฟล์สำคัญ
-- `CMakeLists.txt`: ตั้งค่า path พื้นฐานให้มองไปยัง `pjsip/pjproject/install`, `third_party/openh264`, `third_party/vcpkg`
+- `CMakeLists.txt`: ตั้งค่า path พื้นฐานให้มองไปยัง `vendor/pjsip/install`, `third_party/openh264`, `third_party/vcpkg`
 - `scripts/setup-windows.ps1`: เตรียม vcpkg+SDL2, โคลน/บิลด์ OpenH264, บิลด์ PJSIP
 - `scripts/build.ps1`: คอนฟิกและบิลด์โปรเจกต์หลัก (CMake)
-- `pjsip/pjproject/pjlib/include/pj/config_site.h`: เปิด video, SDL2, OpenH264
+- `pjsip/pjproject/pjlib/include/pj/config_site.h`: เปิด video, SDL2, OpenH264 (ใช้เมื่อเลือกบิลด์ PJSIP เอง)
 
 ## ปัญหาที่พบบ่อย
 - MSBuild ไม่ถูกพบ: ติดตั้ง Visual Studio Build Tools (และ C++ workload)
 - SDL2.lib ไม่พบ: ให้รัน `scripts/setup-windows.ps1` เพื่อให้ vcpkg ติดตั้ง SDL2 ใน `third_party/vcpkg`
 - openh264-8.dll ไม่พบ: ให้รัน `scripts/setup-windows.ps1` เพื่อบิลด์ OpenH264
-- ลิงก์ไม่เจอ PJSIP: ตรวจว่า `pjsip/pjproject/install/lib/libpjproject-*.lib` มีอยู่และ `install/include` มี header ครบ
+- ลิงก์ไม่เจอ PJSIP: ตรวจว่า `vendor/pjsip/install/lib/libpjproject-*.lib` มีอยู่และ `vendor/pjsip/install/include` มี header ครบ
 
 ## หมายเหตุด้านไลเซนส์
 - PJSIP (pjproject) อยู่ภายใต้ GPLv2 หรือไลเซนส์เชิงพาณิชย์ โปรดตรวจสอบความสอดคล้องของไลเซนส์โค้ดของคุณเมื่อแจกจ่าย

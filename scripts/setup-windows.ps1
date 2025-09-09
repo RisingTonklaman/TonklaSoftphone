@@ -62,6 +62,11 @@ Invoke-Step 'Fetch and build OpenH264 (x64 Release, shared)' {
 # 4) Build PJSIP from in-tree pjproject (optional)
 if ($BuildPjsip) {
   $PjRoot = Join-Path $RepoRoot 'pjsip/pjproject'
+  if (-not (Test-Path $PjRoot)) {
+    Invoke-Step 'Clone pjproject (PJSIP sources)' {
+      git clone https://github.com/pjsip/pjproject $PjRoot | Out-Null
+    }
+  }
   $Sln = Join-Path $PjRoot 'pjproject-vs14.sln'
   if (-not (Test-Path $Sln)) { throw "PJSIP solution not found: $Sln" }
 
@@ -75,13 +80,20 @@ if ($BuildPjsip) {
   if (-not $msbuild) { $msbuild = (Get-Command msbuild.exe -ErrorAction SilentlyContinue).Source }
   if (-not $msbuild) { throw 'MSBuild not found. Install Visual Studio Build Tools with C++ workload.' }
 
+  # Ensure config_site.h enables video + SDL + OpenH264
+  $CfgDst = Join-Path $PjRoot 'pjlib/include/pj/config_site.h'
+  if (-not (Test-Path $CfgDst)) {
+    $CfgSrc = Join-Path $RepoRoot 'scripts/pjsip-config/config_site.h'
+    if (Test-Path $CfgSrc) { Copy-Item $CfgSrc $CfgDst -Force }
+  }
+
   Invoke-Step 'Build PJSIP (Release|x64)' {
     & $msbuild $Sln /p:Configuration=Release /p:Platform=x64 /m | Write-Host
   }
 
-  Invoke-Step 'Package PJSIP headers and libs into install/' {
-    $InstallInc = Join-Path $PjRoot 'install/include'
-    $InstallLib = Join-Path $PjRoot 'install/lib'
+  Invoke-Step 'Package PJSIP headers and libs into vendor/pjsip/install/' {
+    $InstallInc = Join-Path $RepoRoot 'vendor/pjsip/install/include'
+    $InstallLib = Join-Path $RepoRoot 'vendor/pjsip/install/lib'
     New-Item -ItemType Directory -Force -Path $InstallInc,$InstallLib | Out-Null
 
     # Copy headers from each component include/

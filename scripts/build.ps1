@@ -9,7 +9,7 @@ $RepoRoot = Split-Path -Parent $PSScriptRoot
 $Third    = Join-Path $RepoRoot 'third_party'
 $Vcpkg    = Join-Path $Third 'vcpkg'
 $OH264    = Join-Path $Third 'openh264'
-$PjInstall= Join-Path $RepoRoot 'pjsip/pjproject/install'
+$PjInstall= Join-Path $RepoRoot 'vendor/pjsip/install'
 
 # Quick checks
 if (-not (Test-Path (Join-Path $Vcpkg 'installed/x64-windows/lib/SDL2.lib'))) {
@@ -21,8 +21,8 @@ if (-not (Test-Path (Join-Path $OH264 'build_x64/openh264.lib'))) {
   & (Join-Path $PSScriptRoot 'setup-windows.ps1')
 }
 if (-not (Test-Path (Join-Path $PjInstall 'lib'))) {
-  Write-Warning 'PJSIP install not found. Running setup...'
-  & (Join-Path $PSScriptRoot 'setup-windows.ps1')
+  Write-Warning 'PJSIP install not found. Running setup with -BuildPjsip...'
+  & (Join-Path $PSScriptRoot 'setup-windows.ps1') -BuildPjsip
 }
 
 $BuildDir = Join-Path $RepoRoot 'build_x64'

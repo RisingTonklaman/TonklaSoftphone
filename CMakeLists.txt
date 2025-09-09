@@ -6,7 +6,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # ---- Roots ----
 # Defaults to local, override if you have system installs
-set(PJSIP_ROOT "${CMAKE_SOURCE_DIR}/pjsip/pjproject/install" CACHE PATH "Path to PJSIP install root (with include/ and lib/)")
+set(PJSIP_ROOT "${CMAKE_SOURCE_DIR}/vendor/pjsip/install" CACHE PATH "Path to PJSIP install root (with include/ and lib/)")
 set(OPENH264_DIR "${CMAKE_SOURCE_DIR}/third_party/openh264" CACHE PATH "OpenH264 root")
 set(VCPKG_DIR "${CMAKE_SOURCE_DIR}/third_party/vcpkg" CACHE PATH "vcpkg root (for SDL2)")
 
