@@ -39,3 +39,4 @@
 # Local env files
 *.env
 *.local
+/pjsip
