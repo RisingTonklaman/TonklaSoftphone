@@ -134,10 +134,64 @@ static void list_video_devices() {
 class MyCall : public Call {
 public:
     using Call::Call;
+
+    // New public API: set tx level and toggle mute
+    void setTxLevel(float g) {
+        try {
+            prevTxLevel_ = g;
+            CallInfo ci = getInfo();
+            for (unsigned i = 0; i < ci.media.size(); ++i) {
+                const CallMediaInfo &mi = ci.media[i];
+                if (mi.type == PJMEDIA_TYPE_AUDIO && mi.status == PJSUA_CALL_MEDIA_ACTIVE) {
+                    AudioMedia &am = getAudioMedia(i);
+                    am.adjustTxLevel(g);
+                }
+            }
+        } catch (Error &e) {
+            std::cout << "[VOL] setTx error: " << e.info() << "\n";
+        }
+    }
+
+    void toggleMuteTx() {
+        try {
+            CallInfo ci = getInfo();
+            if (!txMuted_) {
+                // mute: set tx level to 0
+                for (unsigned i = 0; i < ci.media.size(); ++i) {
+                    const CallMediaInfo &mi = ci.media[i];
+                    if (mi.type == PJMEDIA_TYPE_AUDIO && mi.status == PJSUA_CALL_MEDIA_ACTIVE) {
+                        AudioMedia &am = getAudioMedia(i);
+                        am.adjustTxLevel(0.0f);
+                    }
+                }
+                txMuted_ = true;
+                std::cout << "[MUTE] microphone muted.\n";
+            } else {
+                // unmute: restore previous tx level
+                for (unsigned i = 0; i < ci.media.size(); ++i) {
+                    const CallMediaInfo &mi = ci.media[i];
+                    if (mi.type == PJMEDIA_TYPE_AUDIO && mi.status == PJSUA_CALL_MEDIA_ACTIVE) {
+                        AudioMedia &am = getAudioMedia(i);
+                        am.adjustTxLevel(prevTxLevel_);
+                    }
+                }
+                txMuted_ = false;
+                std::cout << "[MUTE] microphone unmuted.\n";
+            }
+        } catch (Error &e) {
+            std::cout << "[MUTE] error: " << e.info() << "\n";
+        }
+    }
+
+    bool isTxMuted() const { return txMuted_; }
+
 private:
     pjsua_avi_rec_id recLocal_ = -1;
     pjsua_avi_rec_id recRemote_ = -1;
     bool autoPrev_ = false;
+    // New fields to support mute/restore behaviour
+    float prevTxLevel_ = 1.0f;
+    bool txMuted_ = false;
     static constexpr pj_ssize_t kMaxAviSize = (pj_ssize_t)500000000; // 500 MB
 
     void onCallState(OnCallStateParam &) override {
@@ -168,6 +222,12 @@ private:
                     AudDevManager &adm = Endpoint::instance().audDevManager();
                     am.startTransmit(adm.getPlaybackDevMedia()); // call -> speaker
                     adm.getCaptureDevMedia().startTransmit(am);  // mic  -> call
+                    // If we are currently muted, ensure tx level is 0
+                    if (txMuted_) {
+                        am.adjustTxLevel(0.0f);
+                    } else {
+                        am.adjustTxLevel(prevTxLevel_);
+                    }
                 } catch (Error &e) {
                     std::cout << "[MEDIA] audio setup error: " << e.info() << "\n";
                 }
@@ -476,6 +536,7 @@ int main(int argc, char* argv[]) {
           << "  w <path.wav>     : play WAV into call\n"
           << "  tx <gain>        : set TX level (e.g. 1.10)\n"
           << "  rx <gain>        : set RX level (e.g. 1.05)\n"
+          << "  mute             : toggle microphone mute\n"
           << "  pv [cap_id]      : start local camera preview (default cap 0)\n"
           << "  pvoff [cap_id]   : stop local camera preview (default cap 0)\n"
           << "  lsvid            : list video devices (cap/render)\n"
@@ -538,17 +599,28 @@ int main(int argc, char* argv[]) {
                 float g=1.0f; std::cin >> g;
                 if (!g_activeCall) { std::cout << "No call.\n"; continue; }
                 try{
-                    CallInfo ci=g_activeCall->getInfo();
-                    for (unsigned i=0;i<ci.media.size();++i){
-                        const auto &mi=ci.media[i];
-                        if (mi.type==PJMEDIA_TYPE_AUDIO && mi.status==PJSUA_CALL_MEDIA_ACTIVE){
-                            AudioMedia &am=g_activeCall->getAudioMedia(i);
-                            if (cmd=="tx") am.adjustTxLevel(g); else am.adjustRxLevel(g);
-                            std::cout << "[VOL] " << cmd << "="<<g<<"\n";
-                            break;
+                    if (cmd == "tx") {
+                        // Use MyCall helper to keep track of previous TX level
+                        g_activeCall->setTxLevel(g);
+                        std::cout << "[VOL] tx="<<g<<"\n";
+                    } else {
+                        CallInfo ci=g_activeCall->getInfo();
+                        for (unsigned i=0;i<ci.media.size();++i){
+                            const auto &mi=ci.media[i];
+                            if (mi.type==PJMEDIA_TYPE_AUDIO && mi.status==PJSUA_CALL_MEDIA_ACTIVE){
+                                AudioMedia &am=g_activeCall->getAudioMedia(i);
+                                am.adjustRxLevel(g);
+                                std::cout << "[VOL] rx="<<g<<"\n";
+                                break;
+                            }
                         }
                     }
                 }catch(Error &e){ std::cout << "[VOL] error: " << e.info() << "\n"; }
+
+            } else if (cmd == "mute") {
+                if (!g_activeCall) { std::cout << "No call.\n"; continue; }
+                g_activeCall->toggleMuteTx();
+                std::cout << "[MUTE] microphone " << (g_activeCall->isTxMuted() ? "muted" : "unmuted") << ".\n";
 
             } else if (cmd == "pv") {
                 int capId = 0; // default Integrated Camera
