@@ -5,6 +5,10 @@ ffmpeg -y -f gdigrab -framerate 30 -draw_mouse 0 -i title="pj-remote-video" -f d
 C:\TonklaSoftphone\build_x64\Release\softphone.exe 1073 pass1073 192.168.100.200
 C:\Users\Pond\Documents\GitHub\SIP-record-video\build_x64\Release\softphone.exe 1073 pass1073 192.168.100.200
 
+
+powershell -ExecutionPolicy Bypass -File .\scripts\build.ps1 -Config Release
+powershell -ExecutionPolicy Bypass -File .\scripts\package-portable.ps1 -Config Release
+
 ----------------------
 cd "C:\Users\Pond\Documents\GitHub\SIP-record-video"
 
