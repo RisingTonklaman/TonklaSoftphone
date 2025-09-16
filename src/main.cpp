@@ -10,6 +10,12 @@
 #include <ctime>
 #include <windows.h>
 
+#include <mutex>
+#include <thread>
+#include <chrono>
+#include <atomic>
+#include <algorithm>
+
 using namespace pj;
 
 static std::unique_ptr<class MyCall> g_activeCall;
@@ -137,50 +143,85 @@ public:
 
     // New public API: set tx level and toggle mute
     void setTxLevel(float g) {
-        try {
-            prevTxLevel_ = g;
-            CallInfo ci = getInfo();
-            for (unsigned i = 0; i < ci.media.size(); ++i) {
-                const CallMediaInfo &mi = ci.media[i];
-                if (mi.type == PJMEDIA_TYPE_AUDIO && mi.status == PJSUA_CALL_MEDIA_ACTIVE) {
-                    AudioMedia &am = getAudioMedia(i);
-                    am.adjustTxLevel(g);
-                }
+        float tg = clampGain(g);
+        {
+            std::lock_guard<std::mutex> lk(audioMutex_);
+            prevTxLevel_ = tg;
+        }
+        // If muted just remember value and do not apply
+        if (txMuted_) {
+            std::cout << "[VOL] tx set (deferred while muted)="<< tg << "\n";
+            return;
+        }
+
+        // Stop any running ramp
+        stopRamp();
+
+        // Start ramp to new level (small smooth transition)
+        rampRunning_.store(true);
+        rampThread_ = std::thread([this, tg]() {
+            const int steps = 10;
+            const int stepMs = 20; // ~200ms total
+            float start = appliedTxLevel_.load();
+            for (int s = 1; s <= steps && rampRunning_.load(); ++s) {
+                float t = (float)s / steps;
+                float val = start + (tg - start) * t;
+                applyTxToAll(val);
+                appliedTxLevel_.store(val);
+                std::this_thread::sleep_for(std::chrono::milliseconds(stepMs));
             }
+            if (rampRunning_.load()) {
+                applyTxToAll(tg);
+                appliedTxLevel_.store(tg);
+            }
+            rampRunning_.store(false);
+        });
+        // detach/join policy: keep joinable and join later when stopping ramp or destructing
+        // We'll leave thread joinable and join it in stopRamp()/onCallState
+
+        std::cout << "[VOL] tx="<< tg << " (ramping)\n";
+    }
+
+    // Explicitly set mute state (stop/start capture transmit so remote won't hear)
+    void setMute(bool on) {
+        try {
+            CallInfo ci = getInfo();
+            AudDevManager &adm = Endpoint::instance().audDevManager();
+            if (on && !txMuted_) {
+                // stop any ramp to avoid races
+                stopRamp();
+                for (unsigned i = 0; i < ci.media.size(); ++i) {
+                    const CallMediaInfo &mi = ci.media[i];
+                    if (mi.type == PJMEDIA_TYPE_AUDIO && mi.status == PJSUA_CALL_MEDIA_ACTIVE) {
+                        AudioMedia &am = getAudioMedia(i);
+                        // Stop sending capture -> call so remote won't hear us
+                        adm.getCaptureDevMedia().stopTransmit(am);
+                    }
+                }
+                txMuted_ = true;
+            } else if (!on && txMuted_) {
+                for (unsigned i = 0; i < ci.media.size(); ++i) {
+                    const CallMediaInfo &mi = ci.media[i];
+                    if (mi.type == PJMEDIA_TYPE_AUDIO && mi.status == PJSUA_CALL_MEDIA_ACTIVE) {
+                        AudioMedia &am = getAudioMedia(i);
+                        // Restart capture -> call
+                        adm.getCaptureDevMedia().startTransmit(am);
+                        // Restore TX level
+                        applyTxToAll(prevTxLevel_);
+                        appliedTxLevel_.store(prevTxLevel_);
+                    }
+                }
+                txMuted_ = false;
+            }
+            std::cout << "[MUTE] set to " << (on?"ON":"OFF") << "\n";
         } catch (Error &e) {
-            std::cout << "[VOL] setTx error: " << e.info() << "\n";
+            std::cout << "[MUTE] error: " << e.info() << "\n";
         }
     }
 
     void toggleMuteTx() {
-        try {
-            CallInfo ci = getInfo();
-            if (!txMuted_) {
-                // mute: set tx level to 0
-                for (unsigned i = 0; i < ci.media.size(); ++i) {
-                    const CallMediaInfo &mi = ci.media[i];
-                    if (mi.type == PJMEDIA_TYPE_AUDIO && mi.status == PJSUA_CALL_MEDIA_ACTIVE) {
-                        AudioMedia &am = getAudioMedia(i);
-                        am.adjustTxLevel(0.0f);
-                    }
-                }
-                txMuted_ = true;
-                std::cout << "[MUTE] microphone muted.\n";
-            } else {
-                // unmute: restore previous tx level
-                for (unsigned i = 0; i < ci.media.size(); ++i) {
-                    const CallMediaInfo &mi = ci.media[i];
-                    if (mi.type == PJMEDIA_TYPE_AUDIO && mi.status == PJSUA_CALL_MEDIA_ACTIVE) {
-                        AudioMedia &am = getAudioMedia(i);
-                        am.adjustTxLevel(prevTxLevel_);
-                    }
-                }
-                txMuted_ = false;
-                std::cout << "[MUTE] microphone unmuted.\n";
-            }
-        } catch (Error &e) {
-            std::cout << "[MUTE] error: " << e.info() << "\n";
-        }
+        // Delegate to setMute to centralize behavior
+        setMute(!txMuted_);
     }
 
     bool isTxMuted() const { return txMuted_; }
@@ -194,12 +235,72 @@ private:
     bool txMuted_ = false;
     static constexpr pj_ssize_t kMaxAviSize = (pj_ssize_t)500000000; // 500 MB
 
+    // New synchronization/ramp fields
+    std::mutex audioMutex_;
+    std::thread rampThread_;
+    std::atomic<bool> rampRunning_{false};
+    std::atomic<float> appliedTxLevel_{1.0f};
+
+    static float clampGain(float g) {
+        return std::clamp(g, 0.0f, 2.0f);
+    }
+
+    void stopRamp() {
+        // Signal stop and join thread if running
+        rampRunning_.store(false);
+        if (rampThread_.joinable()) {
+            try { rampThread_.join(); } catch (...) {}
+        }
+    }
+
+    void applyTxToAll(float val) {
+        std::lock_guard<std::mutex> lk(audioMutex_);
+        try {
+            CallInfo ci = getInfo();
+            for (unsigned i = 0; i < ci.media.size(); ++i) {
+                const CallMediaInfo &mi = ci.media[i];
+                if (mi.type == PJMEDIA_TYPE_AUDIO && mi.status == PJSUA_CALL_MEDIA_ACTIVE) {
+                    try {
+                        AudioMedia &am = getAudioMedia(i);
+                        am.adjustTxLevel(val);
+                    } catch (Error &e) {
+                        std::cout << "[VOL] applyTx error: " << e.info() << "\n";
+                    }
+                }
+            }
+        } catch (...) {}
+    }
+
     void onCallState(OnCallStateParam &) override {
         CallInfo ci = getInfo();
         std::cout << "[CALL] state=" << ci.stateText
                   << " (" << ci.lastStatusCode << " " << ci.lastReason << ")\n";
         if (ci.state == PJSIP_INV_STATE_DISCONNECTED) {
             std::cout << "[CALL] disconnected.\n";
+            // stop any ramp threads before touching media
+            stopRamp();
+            // Ensure media transmit is stopped so remote audio/sending is torn down
+            try {
+                AudDevManager &adm = Endpoint::instance().audDevManager();
+                for (unsigned i = 0; i < ci.media.size(); ++i) {
+                    const CallMediaInfo &mi = ci.media[i];
+                    if (mi.type == PJMEDIA_TYPE_AUDIO) {
+                        try {
+                            if (mi.status == PJSUA_CALL_MEDIA_ACTIVE) {
+                                AudioMedia &am = getAudioMedia(i);
+                                // stop call -> speaker
+                                try { am.stopTransmit(adm.getPlaybackDevMedia()); } catch (...) {}
+                                // stop mic -> call
+                                try { adm.getCaptureDevMedia().stopTransmit(am); } catch (...) {}
+                            }
+                        } catch (Error &e) {
+                            std::cout << "[CALL] stop media error: " << e.info() << "\n";
+                        }
+                    }
+                }
+            } catch (Error &e) {
+                std::cout << "[CALL] auddev error: " << e.info() << "\n";
+            }
             // หน่วงสั้นๆ ให้ writer flush ก่อนปิด
             pj_thread_sleep(400);
             if (recLocal_ >= 0) { pjsua_avi_recorder_destroy(recLocal_); recLocal_ = -1; }
@@ -222,12 +323,14 @@ private:
                     AudDevManager &adm = Endpoint::instance().audDevManager();
                     am.startTransmit(adm.getPlaybackDevMedia()); // call -> speaker
                     adm.getCaptureDevMedia().startTransmit(am);  // mic  -> call
-                    // If we are currently muted, ensure tx level is 0
+                    // If we are currently muted, stop capture transmit so remote doesn't hear
                     if (txMuted_) {
-                        am.adjustTxLevel(0.0f);
+                        adm.getCaptureDevMedia().stopTransmit(am);
                     } else {
-                        am.adjustTxLevel(prevTxLevel_);
+                        // Ensure applied TX level is enforced
+                        applyTxToAll(appliedTxLevel_.load());
                     }
+                    // Note: TX level/gain is managed separately via setTxLevel (prevTxLevel_)
                 } catch (Error &e) {
                     std::cout << "[MEDIA] audio setup error: " << e.info() << "\n";
                 }
@@ -619,7 +722,18 @@ int main(int argc, char* argv[]) {
 
             } else if (cmd == "mute") {
                 if (!g_activeCall) { std::cout << "No call.\n"; continue; }
-                g_activeCall->toggleMuteTx();
+                // Support: "mute" (toggle), "mute on", "mute off" on the same input line
+                if (std::cin.peek()==' ' || std::cin.peek()=='\t') { std::cin.get(); }
+                std::string arg;
+                // If next token is alphabetic, read it (on/off)
+                if (std::isalpha(std::cin.peek())) { std::cin >> arg; }
+                if (!arg.empty()) {
+                    if (arg == "on") g_activeCall->setMute(true);
+                    else if (arg == "off") g_activeCall->setMute(false);
+                    else { /* unknown arg, ignore */ }
+                } else {
+                    g_activeCall->toggleMuteTx();
+                }
                 std::cout << "[MUTE] microphone " << (g_activeCall->isTxMuted() ? "muted" : "unmuted") << ".\n";
 
             } else if (cmd == "pv") {
