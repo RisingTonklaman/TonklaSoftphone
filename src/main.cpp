@@ -15,14 +15,13 @@
 #include <chrono>
 #include <atomic>
 #include <algorithm>
-#include <unordered_set>
-#include <unordered_map>
 
 using namespace pj;
 
 static std::unique_ptr<class MyCall> g_activeCall;
 // No custom host windows; we rename native SDL windows via SetWindowTextA
 
+<<<<<<< HEAD
 // Ensure a native HWND is a normal movable/resizable window
 static void make_window_movable(HWND hwnd) {
     if (!hwnd) return;
@@ -122,6 +121,10 @@ static void ensure_subclass_for_drag(HWND hwnd) {
 }
 
 // (removed unused forward decl of create_or_get_window)
+=======
+// Forward decl for helper defined at bottom
+static HWND create_or_get_window(const std::string& title, int x, int y, int w, int h);
+>>>>>>> parent of cb7f0b0 (update)
 
 /* -----------------------------------------------------------
    Codec helpers
@@ -190,11 +193,7 @@ static pj_status_t preview_start(int cap_dev = -1) {
             wi.hwnd.type == PJMEDIA_VID_DEV_HWND_TYPE_WINDOWS &&
             wi.hwnd.info.win.hwnd)
         {
-            HWND hwnd = (HWND)wi.hwnd.info.win.hwnd;
-            SetWindowTextA(hwnd, "pj-local-preview");
-            make_window_movable(hwnd);
-            bring_window_to_front(hwnd);
-            ensure_subclass_for_drag(hwnd);
+            SetWindowTextA((HWND)wi.hwnd.info.win.hwnd, "pj-local-preview");
         }
     }
     return PJ_SUCCESS;
@@ -355,8 +354,6 @@ private:
     std::thread rampThread_;
     std::atomic<bool> rampRunning_{false};
     std::atomic<float> appliedTxLevel_{1.0f};
-    std::unordered_set<int> placedWins_;
-    bool remoteBroughtFront_ = false;
 
     static float clampGain(float g) {
         return std::clamp(g, 0.0f, 2.0f);
@@ -455,48 +452,30 @@ private:
 
                 // Attach unique title to remote renderer window
                 if (mi.videoIncomingWindowId != PJSUA_INVALID_ID) {
-                    // Position only once per unique window id to allow user dragging later
-                    if (!placedWins_.count((int)mi.videoIncomingWindowId)) {
-                        pjmedia_coord pos = {800, 100};
-                        pjmedia_rect_size sz = {640, 480};
-                        pjsua_vid_win_set_pos(mi.videoIncomingWindowId, &pos);
-                        pjsua_vid_win_set_size(mi.videoIncomingWindowId, &sz);
-                        placedWins_.insert((int)mi.videoIncomingWindowId);
-                    }
-
+                    pjmedia_coord pos = {800, 100};
+                    pjmedia_rect_size sz = {640, 480};
+                    pjsua_vid_win_set_pos(mi.videoIncomingWindowId, &pos);
+                    pjsua_vid_win_set_size(mi.videoIncomingWindowId, &sz);
                     pjsua_vid_win_info wi{};
                     if (pjsua_vid_win_get_info(mi.videoIncomingWindowId, &wi) == PJ_SUCCESS &&
                         wi.hwnd.type == PJMEDIA_VID_DEV_HWND_TYPE_WINDOWS &&
                         wi.hwnd.info.win.hwnd)
                     {
-                        HWND hwnd = (HWND)wi.hwnd.info.win.hwnd;
-                        SetWindowTextA(hwnd, "pj-remote-video");
-                        make_window_movable(hwnd);
-                        if (!remoteBroughtFront_) {
-                            bring_window_to_front(hwnd);
-                            remoteBroughtFront_ = true;
-                        }
-                        ensure_subclass_for_drag(hwnd);
+                        SetWindowTextA((HWND)wi.hwnd.info.win.hwnd, "pj-remote-video");
                     }
                 }
                 // แสดงหน้าต่างวิดีโอปลายทางอัตโนมัติ
                 {
-                    // Just ensure windows are shown; don't force all to the same position.
                     pjsua_vid_win_id wids[PJSUA_MAX_VID_WINS];
                     unsigned cnt = PJSUA_MAX_VID_WINS;
                     if (pjsua_vid_enum_wins(wids, &cnt) == PJ_SUCCESS) {
                         for (unsigned k = 0; k < cnt; ++k) {
+                            // API ชุดนี้ไม่มี field ประเภทหน้าต่าง ให้โชว์ทุกหน้าต่างแทน
                             pjsua_vid_win_set_show(wids[k], PJ_TRUE);
-                            // Try to ensure native windows are movable
-                            pjsua_vid_win_info wi{};
-                            if (pjsua_vid_win_get_info(wids[k], &wi) == PJ_SUCCESS &&
-                                wi.hwnd.type == PJMEDIA_VID_DEV_HWND_TYPE_WINDOWS &&
-                                wi.hwnd.info.win.hwnd)
-                            {
-                                HWND hwnd = (HWND)wi.hwnd.info.win.hwnd;
-                                make_window_movable(hwnd);
-                                ensure_subclass_for_drag(hwnd);
-                            }
+                            pjmedia_coord pos = {800, 100};
+                            pjmedia_rect_size sz = {640, 480};
+                            pjsua_vid_win_set_pos(wids[k], &pos);
+                            pjsua_vid_win_set_size(wids[k], &sz);
                         }
                     }
                 }
