@@ -6,8 +6,7 @@
 #include <iostream>
 #include <memory>
 #include <string>
-#include <filesystem>
-#include <ctime>
+// <filesystem> and <ctime> were only used in disabled recording code; remove to slim includes
 #include <windows.h>
 #include <cstdlib>
 
@@ -122,31 +121,12 @@ static void ensure_subclass_for_drag(HWND hwnd) {
     }
 }
 
-// Forward decl for helper defined at bottom
-static HWND create_or_get_window(const std::string& title, int x, int y, int w, int h);
+// (removed unused forward decl of create_or_get_window)
 
 /* -----------------------------------------------------------
    Codec helpers
 ----------------------------------------------------------- */
-static void preferH264() {
-    auto &ep = Endpoint::instance();
-    const char* names[] = {"H264/90000","H264/97","H264","h264"};
-    for (auto* s : names) { try { ep.codecSetPriority(s, 255); } catch (...) {} }
-}
-
-static void preferH264_strict_no_enum() {
-    auto &ep = Endpoint::instance();
-    const char* others[] = {
-        "VP8/90000","VP8/98","VP8","vp8",
-        "VP9/90000","VP9","vp9",
-        "H263/90000","H263-1998/90000","H263-2000/90000","H263","h263",
-        "THEORA/90000","THEORA","theora",
-        "MP4V-ES/90000","MP4V-ES","mp4v-es",
-        "MJPEG/90000","MJPEG","mjpeg"
-    };
-    for (auto* s : others) { try { ep.codecSetPriority(s, 0); } catch (...) {} }
-    preferH264();
-}
+// (removed unused preferH264* helpers)
 
 static void forceH264Only() {
     pjsua_codec_info ci[64]; unsigned n = 64;
@@ -312,6 +292,7 @@ public:
                         }
                     }
                 }
+                // Keep outgoing path silent by disconnecting mic from call media (device-agnostic)
                 // Hard-mute fallback: drop capture device TX level to 0, so even if a
                 // reconnect happens, mic path stays silent. This affects only outgoing.
                 try { adm.getCaptureDevMedia().adjustTxLevel(0.0f); } catch (...) {}
@@ -334,6 +315,7 @@ public:
                         }
                     }
                 }
+                // Call port gain unchanged; only mic path is restored
                 // Restore capture device TX back to normal
                 try { adm.getCaptureDevMedia().adjustTxLevel(1.0f); } catch (...) {}
                 txMuted_ = false;
@@ -362,13 +344,11 @@ public:
     bool isTxMuted() const { return txMuted_; }
 
 private:
-    pjsua_avi_rec_id recLocal_ = -1;
-    pjsua_avi_rec_id recRemote_ = -1;
     bool autoPrev_ = false;
     // New fields to support mute/restore behaviour
     float prevTxLevel_ = 1.0f;
     bool txMuted_ = false;
-    static constexpr pj_ssize_t kMaxAviSize = (pj_ssize_t)500000000; // 500 MB
+    
 
     // New synchronization/ramp fields
     std::mutex audioMutex_;
@@ -440,8 +420,7 @@ private:
             }
             // หน่วงสั้นๆ ให้ writer flush ก่อนปิด
             pj_thread_sleep(400);
-            if (recLocal_ >= 0) { pjsua_avi_recorder_destroy(recLocal_); recLocal_ = -1; }
-            if (recRemote_ >= 0) { pjsua_avi_recorder_destroy(recRemote_); recRemote_ = -1; }
+            
             if (autoPrev_) { preview_stop(0); autoPrev_ = false; }
             g_activeCall.reset();
         }
@@ -523,8 +502,62 @@ private:
                 }
                 // Auto local preview & start recorders
                 if (!autoPrev_) {
-                    if (preview_start(0) == PJ_SUCCESS) autoPrev_ = true;
+                    std::thread([this]() {
+                        pj_thread_sleep(350);
+                        if (preview_start(0) == PJ_SUCCESS) autoPrev_ = true;
+                    }).detach();
                 }
+                // Ensure remote video window becomes visible shortly after activation
+                if (winEnsureThread_.joinable()) {
+                    try { winEnsureThread_.join(); } catch (...) {}
+                }
+                winEnsureThread_ = std::thread([this]() {
+                    for (int attempt = 0; attempt < 15; ++attempt) {
+                        pj_thread_sleep(100);
+                        try {
+                            CallInfo ci2 = this->getInfo();
+                            for (unsigned j = 0; j < ci2.media.size(); ++j) {
+                                const CallMediaInfo &mj = ci2.media[j];
+                                if (mj.type == PJMEDIA_TYPE_VIDEO && mj.status == PJSUA_CALL_MEDIA_ACTIVE) {
+                                    if (mj.videoIncomingWindowId != PJSUA_INVALID_ID) {
+                                        pjsua_vid_win_id wid = mj.videoIncomingWindowId;
+                                        pjsua_vid_win_set_show(wid, PJ_TRUE);
+                                        if (!placedWins_.count((int)wid)) {
+                                            pjmedia_coord pos = {800, 100};
+                                            pjmedia_rect_size sz = {640, 480};
+                                            pjsua_vid_win_set_pos(wid, &pos);
+                                            pjsua_vid_win_set_size(wid, &sz);
+                                            placedWins_.insert((int)wid);
+                                        }
+                                        pjsua_vid_win_info wi{};
+                                        if (pjsua_vid_win_get_info(wid, &wi) == PJ_SUCCESS &&
+                                            wi.hwnd.type == PJMEDIA_VID_DEV_HWND_TYPE_WINDOWS &&
+                                            wi.hwnd.info.win.hwnd)
+                                        {
+                                            HWND hwnd = (HWND)wi.hwnd.info.win.hwnd;
+                                            SetWindowTextA(hwnd, "pj-remote-video");
+                                            make_window_movable(hwnd);
+                                            ensure_subclass_for_drag(hwnd);
+                                            if (!remoteBroughtFront_) {
+                                                bring_window_to_front(hwnd);
+                                                remoteBroughtFront_ = true;
+                                            }
+                                            return;
+                                        }
+                                    }
+                                }
+                            }
+                            // Also surface any hidden video windows
+                            pjsua_vid_win_id wids[PJSUA_MAX_VID_WINS];
+                            unsigned cnt = PJSUA_MAX_VID_WINS;
+                            if (pjsua_vid_enum_wins(wids, &cnt) == PJ_SUCCESS) {
+                                for (unsigned k = 0; k < cnt; ++k) {
+                                    pjsua_vid_win_set_show(wids[k], PJ_TRUE);
+                                }
+                            }
+                        } catch (...) { }
+                    }
+                });
                 // --- Recording disabled temporarily (handled by external main.py) ---
 #if 0
                 auto make_dir = [](){
@@ -536,6 +569,7 @@ private:
                 auto now_ts = [](){
                     char buf[64];
                     std::time_t t = std::time(nullptr);
+>>>>>>> theirs
                     std::tm tm{};
 #ifdef _WIN32
                     localtime_s(&tm, &t);

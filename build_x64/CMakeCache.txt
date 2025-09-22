@@ -182,6 +182,9 @@ SDL2_DLL:FILEPATH=C:/TonklaSoftphone/third_party/vcpkg/installed/x64-windows/bin
 //Path to a library.
 SDL2_LIB:FILEPATH=C:/TonklaSoftphone/third_party/vcpkg/installed/x64-windows/lib/SDL2.lib
 
+//Write exe to softphone-dev.exe instead of softphone.exe
+SOFTPHONE_ALT_OUT:BOOL=OFF
+
 //Value Computed by CMake
 TonklaSoftphone_BINARY_DIR:STATIC=C:/TonklaSoftphone/build_x64
 
