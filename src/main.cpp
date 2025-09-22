@@ -16,11 +16,111 @@
 #include <chrono>
 #include <atomic>
 #include <algorithm>
+#include <unordered_set>
+#include <unordered_map>
 
 using namespace pj;
 
 static std::unique_ptr<class MyCall> g_activeCall;
 // No custom host windows; we rename native SDL windows via SetWindowTextA
+
+// Ensure a native HWND is a normal movable/resizable window
+static void make_window_movable(HWND hwnd) {
+    if (!hwnd) return;
+    LONG_PTR style = GetWindowLongPtr(hwnd, GWL_STYLE);
+    // Add typical overlapped styles to allow dragging/resizing
+    style |= (WS_OVERLAPPEDWINDOW | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_THICKFRAME);
+    // Clear WS_POPUP if present to avoid borderless
+    style &= ~WS_POPUP;
+    SetWindowLongPtr(hwnd, GWL_STYLE, style);
+    // Apply style change
+    SetWindowPos(hwnd, nullptr, 0, 0, 0, 0,
+                 SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED);
+}
+
+static void bring_window_to_front(HWND hwnd) {
+    if (!hwnd) return;
+    ShowWindow(hwnd, SW_SHOWNORMAL);
+    SetWindowPos(hwnd, HWND_TOP, 0, 0, 0, 0,
+                 SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW);
+    BringWindowToTop(hwnd);
+    SetForegroundWindow(hwnd);
+}
+
+// Subclass native video window to enable click-drag move even if borderless
+static std::unordered_map<HWND, WNDPROC> g_origProc;
+static std::unordered_map<HWND, bool>    g_dragging;
+static std::unordered_map<HWND, POINT>   g_dragStartPt;
+static std::unordered_map<HWND, RECT>    g_dragStartRc;
+
+static LRESULT CALLBACK VideoWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
+    switch (msg) {
+    case WM_LBUTTONDOWN: {
+        // Begin manual drag
+        RECT rc{}; GetWindowRect(hwnd, &rc);
+        POINT pt{}; GetCursorPos(&pt);
+        g_dragging[hwnd] = true;
+        g_dragStartPt[hwnd] = pt;
+        g_dragStartRc[hwnd] = rc;
+        SetCapture(hwnd);
+        return 0;
+    }
+    case WM_MOUSEMOVE: {
+        if ((wParam & MK_LBUTTON) && g_dragging[hwnd]) {
+            POINT pt{}; GetCursorPos(&pt);
+            RECT rc = g_dragStartRc[hwnd];
+            int dx = pt.x - g_dragStartPt[hwnd].x;
+            int dy = pt.y - g_dragStartPt[hwnd].y;
+            int x = rc.left + dx;
+            int y = rc.top + dy;
+            int w = rc.right - rc.left;
+            int h = rc.bottom - rc.top;
+            MoveWindow(hwnd, x, y, w, h, TRUE);
+            return 0;
+        }
+        break;
+    }
+    case WM_LBUTTONUP:
+    case WM_CANCELMODE:
+    case WM_CAPTURECHANGED: {
+        if (g_dragging[hwnd]) {
+            g_dragging[hwnd] = false;
+            ReleaseCapture();
+        }
+        break;
+    }
+    case WM_NCDESTROY: {
+        // Unsubclass to avoid dangling proc
+        auto it = g_origProc.find(hwnd);
+        if (it != g_origProc.end()) {
+            SetWindowLongPtr(hwnd, GWLP_WNDPROC, (LONG_PTR)it->second);
+            g_origProc.erase(it);
+        }
+        g_dragging.erase(hwnd);
+        g_dragStartPt.erase(hwnd);
+        g_dragStartRc.erase(hwnd);
+        break;
+    }
+    default: break;
+    }
+    // Call original proc if available
+    auto it = g_origProc.find(hwnd);
+    if (it != g_origProc.end()) {
+        return CallWindowProc(it->second, hwnd, msg, wParam, lParam);
+    }
+    return DefWindowProc(hwnd, msg, wParam, lParam);
+}
+
+static void ensure_subclass_for_drag(HWND hwnd) {
+    if (!hwnd) return;
+    if (!g_origProc.count(hwnd)) {
+        WNDPROC oldProc = (WNDPROC)GetWindowLongPtr(hwnd, GWLP_WNDPROC);
+        if (oldProc) {
+            g_origProc[hwnd] = oldProc;
+            SetWindowLongPtr(hwnd, GWLP_WNDPROC, (LONG_PTR)VideoWndProc);
+        }
+    }
+}
 
 // Forward decl for helper defined at bottom
 static HWND create_or_get_window(const std::string& title, int x, int y, int w, int h);
@@ -110,7 +210,11 @@ static pj_status_t preview_start(int cap_dev = -1) {
             wi.hwnd.type == PJMEDIA_VID_DEV_HWND_TYPE_WINDOWS &&
             wi.hwnd.info.win.hwnd)
         {
-            SetWindowTextA((HWND)wi.hwnd.info.win.hwnd, "pj-local-preview");
+            HWND hwnd = (HWND)wi.hwnd.info.win.hwnd;
+            SetWindowTextA(hwnd, "pj-local-preview");
+            make_window_movable(hwnd);
+            bring_window_to_front(hwnd);
+            ensure_subclass_for_drag(hwnd);
         }
     }
     return PJ_SUCCESS;
@@ -271,6 +375,8 @@ private:
     std::thread rampThread_;
     std::atomic<bool> rampRunning_{false};
     std::atomic<float> appliedTxLevel_{1.0f};
+    std::unordered_set<int> placedWins_;
+    bool remoteBroughtFront_ = false;
 
     static float clampGain(float g) {
         return std::clamp(g, 0.0f, 2.0f);
@@ -370,30 +476,48 @@ private:
 
                 // Attach unique title to remote renderer window
                 if (mi.videoIncomingWindowId != PJSUA_INVALID_ID) {
-                    pjmedia_coord pos = {800, 100};
-                    pjmedia_rect_size sz = {640, 480};
-                    pjsua_vid_win_set_pos(mi.videoIncomingWindowId, &pos);
-                    pjsua_vid_win_set_size(mi.videoIncomingWindowId, &sz);
+                    // Position only once per unique window id to allow user dragging later
+                    if (!placedWins_.count((int)mi.videoIncomingWindowId)) {
+                        pjmedia_coord pos = {800, 100};
+                        pjmedia_rect_size sz = {640, 480};
+                        pjsua_vid_win_set_pos(mi.videoIncomingWindowId, &pos);
+                        pjsua_vid_win_set_size(mi.videoIncomingWindowId, &sz);
+                        placedWins_.insert((int)mi.videoIncomingWindowId);
+                    }
+
                     pjsua_vid_win_info wi{};
                     if (pjsua_vid_win_get_info(mi.videoIncomingWindowId, &wi) == PJ_SUCCESS &&
                         wi.hwnd.type == PJMEDIA_VID_DEV_HWND_TYPE_WINDOWS &&
                         wi.hwnd.info.win.hwnd)
                     {
-                        SetWindowTextA((HWND)wi.hwnd.info.win.hwnd, "pj-remote-video");
+                        HWND hwnd = (HWND)wi.hwnd.info.win.hwnd;
+                        SetWindowTextA(hwnd, "pj-remote-video");
+                        make_window_movable(hwnd);
+                        if (!remoteBroughtFront_) {
+                            bring_window_to_front(hwnd);
+                            remoteBroughtFront_ = true;
+                        }
+                        ensure_subclass_for_drag(hwnd);
                     }
                 }
                 // แสดงหน้าต่างวิดีโอปลายทางอัตโนมัติ
                 {
+                    // Just ensure windows are shown; don't force all to the same position.
                     pjsua_vid_win_id wids[PJSUA_MAX_VID_WINS];
                     unsigned cnt = PJSUA_MAX_VID_WINS;
                     if (pjsua_vid_enum_wins(wids, &cnt) == PJ_SUCCESS) {
                         for (unsigned k = 0; k < cnt; ++k) {
-                            // API ชุดนี้ไม่มี field ประเภทหน้าต่าง ให้โชว์ทุกหน้าต่างแทน
                             pjsua_vid_win_set_show(wids[k], PJ_TRUE);
-                            pjmedia_coord pos = {800, 100};
-                            pjmedia_rect_size sz = {640, 480};
-                            pjsua_vid_win_set_pos(wids[k], &pos);
-                            pjsua_vid_win_set_size(wids[k], &sz);
+                            // Try to ensure native windows are movable
+                            pjsua_vid_win_info wi{};
+                            if (pjsua_vid_win_get_info(wids[k], &wi) == PJ_SUCCESS &&
+                                wi.hwnd.type == PJMEDIA_VID_DEV_HWND_TYPE_WINDOWS &&
+                                wi.hwnd.info.win.hwnd)
+                            {
+                                HWND hwnd = (HWND)wi.hwnd.info.win.hwnd;
+                                make_window_movable(hwnd);
+                                ensure_subclass_for_drag(hwnd);
+                            }
                         }
                     }
                 }
