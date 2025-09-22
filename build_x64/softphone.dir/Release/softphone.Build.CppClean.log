@@ -1,5 +1,6 @@
 c:\tonklasoftphone\build_x64\softphone.dir\release\main.obj
 c:\tonklasoftphone\build_x64\cmakefiles\generate.stamp
+c:\tonklasoftphone\build_x64\release\sdl2.dll
 c:\tonklasoftphone\build_x64\release\softphone.exe
 c:\tonklasoftphone\build_x64\softphone.dir\release\softphone.tlog\cl.command.1.tlog
 c:\tonklasoftphone\build_x64\softphone.dir\release\softphone.tlog\cl.items.tlog
@@ -12,3 +13,4 @@ c:\tonklasoftphone\build_x64\softphone.dir\release\softphone.tlog\link.command.1
 c:\tonklasoftphone\build_x64\softphone.dir\release\softphone.tlog\link.read.1.tlog
 c:\tonklasoftphone\build_x64\softphone.dir\release\softphone.tlog\link.secondary.1.tlog
 c:\tonklasoftphone\build_x64\softphone.dir\release\softphone.tlog\link.write.1.tlog
+c:\tonklasoftphone\build_x64\softphone.dir\release\softphone.tlog\softphone.write.1u.tlog

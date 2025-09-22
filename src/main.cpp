@@ -9,6 +9,7 @@
 #include <filesystem>
 #include <ctime>
 #include <windows.h>
+#include <cstdlib>
 
 #include <mutex>
 #include <thread>
@@ -183,37 +184,67 @@ public:
     }
 
     // Explicitly set mute state (stop/start capture transmit so remote won't hear)
+    // Adds a hard-mute fallback by forcing TX gain to 0 when muted.
     void setMute(bool on) {
         try {
             CallInfo ci = getInfo();
             AudDevManager &adm = Endpoint::instance().audDevManager();
+
             if (on && !txMuted_) {
-                // stop any ramp to avoid races
+                // Stop any ramp BEFORE touching media to avoid races (do not hold audio mutex here)
                 stopRamp();
+
+                bool anyAffected = false;
                 for (unsigned i = 0; i < ci.media.size(); ++i) {
                     const CallMediaInfo &mi = ci.media[i];
                     if (mi.type == PJMEDIA_TYPE_AUDIO && mi.status == PJSUA_CALL_MEDIA_ACTIVE) {
-                        AudioMedia &am = getAudioMedia(i);
-                        // Stop sending capture -> call so remote won't hear us
-                        adm.getCaptureDevMedia().stopTransmit(am);
+                        try {
+                            AudioMedia &am = getAudioMedia(i);
+                            // 1) Stop sending capture -> call so remote won't hear us (soft-mute)
+                            try { adm.getCaptureDevMedia().stopTransmit(am); } catch (...) {}
+                            anyAffected = true;
+                        } catch (Error &e) {
+                            std::cout << "[MUTE] stop/error: " << e.info() << "\n";
+                        }
                     }
                 }
+                // Hard-mute fallback: drop capture device TX level to 0, so even if a
+                // reconnect happens, mic path stays silent. This affects only outgoing.
+                try { adm.getCaptureDevMedia().adjustTxLevel(0.0f); } catch (...) {}
                 txMuted_ = true;
+                std::cout << "[MUTE] set to ON" << (anyAffected?"":" (no active audio media)") << "\n";
             } else if (!on && txMuted_) {
+                bool anyAffected = false;
                 for (unsigned i = 0; i < ci.media.size(); ++i) {
                     const CallMediaInfo &mi = ci.media[i];
                     if (mi.type == PJMEDIA_TYPE_AUDIO && mi.status == PJSUA_CALL_MEDIA_ACTIVE) {
-                        AudioMedia &am = getAudioMedia(i);
-                        // Restart capture -> call
-                        adm.getCaptureDevMedia().startTransmit(am);
-                        // Restore TX level
-                        applyTxToAll(prevTxLevel_);
-                        appliedTxLevel_.store(prevTxLevel_);
+                        try {
+                            AudioMedia &am = getAudioMedia(i);
+                            // Restart capture -> call
+                            try { adm.getCaptureDevMedia().startTransmit(am); } catch (...) {}
+                            // Restore TX level to previous user setting
+                            applyTxToAll(prevTxLevel_);
+                            anyAffected = true;
+                        } catch (Error &e) {
+                            std::cout << "[MUTE] start/error: " << e.info() << "\n";
+                        }
                     }
                 }
+                // Restore capture device TX back to normal
+                try { adm.getCaptureDevMedia().adjustTxLevel(1.0f); } catch (...) {}
                 txMuted_ = false;
+                std::cout << "[MUTE] set to OFF" << (anyAffected?"":" (no active audio media)") << "\n";
+            } else {
+                // No state change; still dump for diagnostics if requested
+                std::cout << "[MUTE] already " << (txMuted_?"ON":"OFF") << "\n";
             }
-            std::cout << "[MUTE] set to " << (on?"ON":"OFF") << "\n";
+
+            // Optional debug: dump conference graph if env var is set
+            if (std::getenv("SOFTPHONE_MUTE_DEBUG")) {
+                std::cout << "[MUTE][DBG] dumping state...\n";
+                // pjsua_dump prints endpoint state including conference connections
+                pjsua_dump(PJ_TRUE);
+            }
         } catch (Error &e) {
             std::cout << "[MUTE] error: " << e.info() << "\n";
         }
