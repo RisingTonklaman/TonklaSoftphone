@@ -259,32 +259,9 @@ public:
             return;
         }
 
-        // Stop any running ramp
-        stopRamp();
-
-        // Start ramp to new level (small smooth transition)
-        rampRunning_.store(true);
-        rampThread_ = std::thread([this, tg]() {
-            const int steps = 10;
-            const int stepMs = 20; // ~200ms total
-            float start = appliedTxLevel_.load();
-            for (int s = 1; s <= steps && rampRunning_.load(); ++s) {
-                float t = (float)s / steps;
-                float val = start + (tg - start) * t;
-                applyTxToAll(val);
-                appliedTxLevel_.store(val);
-                std::this_thread::sleep_for(std::chrono::milliseconds(stepMs));
-            }
-            if (rampRunning_.load()) {
-                applyTxToAll(tg);
-                appliedTxLevel_.store(tg);
-            }
-            rampRunning_.store(false);
-        });
-        // detach/join policy: keep joinable and join later when stopping ramp or destructing
-        // We'll leave thread joinable and join it in stopRamp()/onCallState
-
-        std::cout << "[VOL] tx="<< tg << " (ramping)\n";
+        // Apply immediately to the capture device level
+        applyTxToAll(tg);
+        std::cout << "[VOL] tx="<< tg << "\n";
     }
 
     // Explicitly set mute state (stop/start capture transmit so remote won't hear)
@@ -326,16 +303,14 @@ public:
                             AudioMedia &am = getAudioMedia(i);
                             // Restart capture -> call
                             try { adm.getCaptureDevMedia().startTransmit(am); } catch (...) {}
-                            // Restore TX level to previous user setting
-                            applyTxToAll(prevTxLevel_);
                             anyAffected = true;
                         } catch (Error &e) {
                             std::cout << "[MUTE] start/error: " << e.info() << "\n";
                         }
                     }
                 }
-                // Restore capture device TX back to normal
-                try { adm.getCaptureDevMedia().adjustTxLevel(1.0f); } catch (...) {}
+                // Restore capture device TX to previous user setting
+                applyTxToAll(prevTxLevel_);
                 txMuted_ = false;
                 std::cout << "[MUTE] set to OFF" << (anyAffected?"":" (no active audio media)") << "\n";
             } else {
@@ -391,20 +366,13 @@ private:
     }
 
     void applyTxToAll(float val) {
-        std::lock_guard<std::mutex> lk(audioMutex_);
+        // TX here = mic -> remote. Prefer adjusting the capture device level
+        // to avoid destabilizing the conference bridge.
         try {
-            CallInfo ci = getInfo();
-            for (unsigned i = 0; i < ci.media.size(); ++i) {
-                const CallMediaInfo &mi = ci.media[i];
-                if (mi.type == PJMEDIA_TYPE_AUDIO && mi.status == PJSUA_CALL_MEDIA_ACTIVE) {
-                    try {
-                        AudioMedia &am = getAudioMedia(i);
-                        am.adjustTxLevel(val);
-                    } catch (Error &e) {
-                        std::cout << "[VOL] applyTx error: " << e.info() << "\n";
-                    }
-                }
-            }
+            AudDevManager &adm = Endpoint::instance().audDevManager();
+            adm.getCaptureDevMedia().adjustTxLevel(val);
+        } catch (Error &e) {
+            std::cout << "[VOL] applyTx error: " << e.info() << "\n";
         } catch (...) {}
     }
 
@@ -464,8 +432,8 @@ private:
                     if (txMuted_) {
                         adm.getCaptureDevMedia().stopTransmit(am);
                     } else {
-                        // Ensure applied TX level is enforced
-                        applyTxToAll(appliedTxLevel_.load());
+                        // Ensure mic level is enforced to the last set value
+                        applyTxToAll(prevTxLevel_);
                     }
                     // Note: TX level/gain is managed separately via setTxLevel (prevTxLevel_)
                 } catch (Error &e) {
@@ -792,8 +760,8 @@ int main(int argc, char* argv[]) {
           << "  a                : answer incoming (200 OK, with video)\n"
           << "  h                : hangup active call\n"
           << "  w <path.wav>     : play WAV into call\n"
-          << "  tx <gain>        : set TX level (e.g. 1.10)\n"
-          << "  rx <gain>        : set RX level (e.g. 1.05)\n"
+          << "  tx <gain>        : set TX (mic -> remote) level 0.0..2.0\n"
+          << "  rx <gain>        : set RX (remote -> speaker) level 0.0..2.0\n"
           << "  mute             : toggle microphone mute\n"
           << "  pv [cap_id]      : start local camera preview (default cap 0)\n"
           << "  pvoff [cap_id]   : stop local camera preview (default cap 0)\n"
@@ -862,15 +830,14 @@ int main(int argc, char* argv[]) {
                         g_activeCall->setTxLevel(g);
                         std::cout << "[VOL] tx="<<g<<"\n";
                     } else {
-                        CallInfo ci=g_activeCall->getInfo();
-                        for (unsigned i=0;i<ci.media.size();++i){
-                            const auto &mi=ci.media[i];
-                            if (mi.type==PJMEDIA_TYPE_AUDIO && mi.status==PJSUA_CALL_MEDIA_ACTIVE){
-                                AudioMedia &am=g_activeCall->getAudioMedia(i);
-                                am.adjustRxLevel(g);
-                                std::cout << "[VOL] rx="<<g<<"\n";
-                                break;
-                            }
+                        // RX: how loud we hear remote. Adjust playback device receive level.
+                        float gg = std::clamp(g, 0.0f, 2.0f);
+                        try {
+                            AudDevManager &adm = Endpoint::instance().audDevManager();
+                            adm.getPlaybackDevMedia().adjustRxLevel(gg);
+                            std::cout << "[VOL] rx="<<gg<<"\n";
+                        } catch (Error &e) {
+                            std::cout << "[VOL] rx error: " << e.info() << "\n";
                         }
                     }
                 }catch(Error &e){ std::cout << "[VOL] error: " << e.info() << "\n"; }

@@ -1,2 +1,0 @@
-C:\TonklaSoftphone\build_x64\Release\SDL2.dll
-C:\TonklaSoftphone\build_x64\softphone.dir\Release\softphone.vcxproj.Up2Date
